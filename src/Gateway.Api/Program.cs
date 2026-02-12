@@ -40,9 +40,9 @@ app.MapPost("/v1/portfolios", async Task<Results<Created<PortfolioResponse>, Bad
         return TypedResults.Created($"/v1/portfolios/{portfolio.Id}", new PortfolioResponse(
             portfolio.Id,
             portfolio.Name,
-            portfolio.CreatedAtUtc
-        ));
-}));
+            portfolio.CreatedAtUtc 
+       ));
+});
 
 app.MapGet("/v1/portfolios/{id:guid}", async Task<Results<Ok<PortfolioDetailsResponse>, NotFound>> (
     Guid id,
