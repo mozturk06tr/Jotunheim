@@ -1,10 +1,8 @@
-﻿using System;
-
+﻿
 namespace Shared.Domain;
 
 public readonly record struct PortfolioId(Guid Value);
 public readonly record struct InstrumentId(Guid Value);
-
 
 public sealed class Portfolio
 {
