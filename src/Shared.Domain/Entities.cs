@@ -1,39 +1,59 @@
-﻿using System;
+﻿namespace Shared.Domain;
 
-namespace Shared.Domain;
-
-public readonly record struct PortfolioId(Guid Value);
-public readonly record struct InstrumentId(Guid Value);
-
-public sealed class Portfolio
+public abstract class Entity
 {
-    public Guid Id { get; private set; }
+    private readonly List<IDomainEvent> _domainEvents = new();
+    private IReadOnlyCollection<IDomainEvent> _domainEventsCollection => _domainEvents;
+
+    /* internal void Raise(IDomainEvent domainEvent)
+    {
+        if (domainEvent is null) throw new ArgumentNullException(nameof(domainEvent));
+        _domainEvents.Add(domainEvent);
+    } */ // Todo -> Manage Fucking Raise()
+    public void ClearEvents () => _domainEvents.Clear();
+    
+}
+public readonly record struct PortfolioId(Guid Value)
+{
+    public static PortfolioId New() => new(Guid.NewGuid());
+    public override string ToString() => Value.ToString();
+}
+
+public readonly record struct InstrumentId(Guid Value)
+{
+    public static InstrumentId New() => new(Guid.NewGuid());
+    public override string ToString() => Value.ToString();
+}
+
+public sealed class Portfolio : Entity
+{
+    public PortfolioId Id { get; private set; }
     public string Name { get; private set; } = "";
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     private readonly List<Position> _positions = new();
-    public IReadOnlyList<Position> Positions => _positions;
+    public IReadOnlyCollection<Position> Positions => _positions;
 
     private Portfolio() { } // EF
 
-    public Portfolio(string name, DateTimeOffset createdAtUtc)
+    public Portfolio(PortfolioId portfolioId, string name, DateTimeOffset createdAtUtc)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Portfolio name is required.", nameof(name));
 
-        Id = Guid.NewGuid();
+        Id = PortfolioId.New();
         Name = name.Trim();
         CreatedAtUtc = createdAtUtc;
+
     }
 
-    public void AddPosition(Guid instrumentId, decimal quantity, DateTimeOffset createdAtUtc)
+    public void AddPosition(InstrumentId instrumentId, decimal quantity, DateTimeOffset createdAtUtc)
     {
-        if (instrumentId == Guid.Empty)
+        if (instrumentId.Value == Guid.Empty)
             throw new ArgumentException("InstrumentId required.", nameof(instrumentId));
         if (quantity == 0m)
             throw new ArgumentException("Quantity cannot be zero.", nameof(quantity));
 
-        // invariant: one position per instrument in this milestone (enforced also by DB unique index)
         if (_positions.Any(p => p.InstrumentId == instrumentId))
             throw new InvalidOperationException("Position already exists for this instrument.");
 
@@ -41,45 +61,28 @@ public sealed class Portfolio
     }
 }
 
-public sealed class Instrument
-{
-    public Guid Id { get; private set; }
-    public string Symbol { get; private set; } = "";
-    public string? Description { get; private set; }
-    public DateTimeOffset CreatedAtUtc { get; private set; }
-
-    private Instrument() { } // EF
-
-    public Instrument(string symbol, string? description, DateTimeOffset createdAtUtc)
-    {
-        if (string.IsNullOrWhiteSpace(symbol))
-            throw new ArgumentException("Symbol required.", nameof(symbol));
-
-        Id = Guid.NewGuid();
-        Symbol = symbol.Trim().ToUpperInvariant();
-        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
-        CreatedAtUtc = createdAtUtc;
-    }
-}
-
 public sealed class Position
 {
-    public Guid PortfolioId { get; private set; }
-    public Guid InstrumentId { get; private set; }
+    public PortfolioId PortfolioId { get; private set; }
+    public InstrumentId InstrumentId { get; private set; }
     public decimal Quantity { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
-    // optimistic concurrency marker (EF will treat as concurrency token)
     public uint Version { get; private set; }
 
     private Position() { } // EF
 
-    internal Position(Guid portfolioId, Guid instrumentId, decimal quantity, DateTimeOffset createdAtUtc)
+    internal Position(PortfolioId portfolioId, InstrumentId instrumentId, decimal quantity, DateTimeOffset createdAtUtc)
     {
+        if (portfolioId.Value == Guid.Empty) throw new ArgumentException("PortfolioId required.", nameof(portfolioId));
+        if (instrumentId.Value == Guid.Empty) throw new ArgumentException("InstrumentId required.", nameof(instrumentId));
+        if (quantity == 0m) throw new ArgumentException("Quantity cannot be zero.", nameof(quantity));
+
         PortfolioId = portfolioId;
         InstrumentId = instrumentId;
         Quantity = quantity;
         CreatedAtUtc = createdAtUtc;
+        Version = Version;
     }
 
     public void SetQuantity(decimal quantity)
@@ -92,21 +95,43 @@ public sealed class Position
 
 public sealed class Price
 {
-    public Guid InstrumentId { get; private set; }
+    public InstrumentId InstrumentId { get; private set; }
     public DateTimeOffset TsUtc { get; private set; }
     public decimal Px { get; private set; }
 
     private Price() { } // EF
 
-    public Price(Guid instrumentId, DateTimeOffset tsUtc, decimal px)
+    public Price(InstrumentId instrumentId, DateTimeOffset tsUtc, decimal px)
     {
-        if (instrumentId == Guid.Empty)
+        if (instrumentId.Value == Guid.Empty)
             throw new ArgumentException("InstrumentId required.", nameof(instrumentId));
         if (px <= 0m)
-            throw new ArgumentException("Price must be > 0.", nameof(px));
+            throw new ArgumentOutOfRangeException(nameof(px), "Price must be > 0.");
 
         InstrumentId = instrumentId;
         TsUtc = tsUtc;
         Px = px;
     }
 }
+
+public sealed class FxMarket : Entity
+{
+    public Guid ParityId { get; private set; }
+    public DateTimeOffset TsUtc { get; private set; }
+    public decimal Px { get; private set; }
+
+    private FxMarket() { } //ef 
+
+    public FxMarket(Guid parityId, DateTimeOffset tsUtc, decimal px)
+    {
+        if (parityId == Guid.Empty)
+            throw new ArgumentException("ParityId required.", nameof(parityId));
+        if (px <= 0m)
+            throw new ArgumentOutOfRangeException(nameof(px), "Price must be > 0.");
+
+        ParityId = parityId;
+        TsUtc = tsUtc;
+        Px = px;
+    }
+}
+

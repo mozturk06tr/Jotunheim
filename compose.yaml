@@ -1,0 +1,13 @@
+﻿services:
+  jotunheim.cli:
+    image: jotunheim.cli
+    build:
+      context: .
+      dockerfile: Jotunheim.Cli/Dockerfile
+
+  logger:
+    image: logger
+    build:
+      context: .
+      dockerfile: src/Logger/Dockerfile
+
