@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Shared.Domain;
+using Shared.Domain.Utils;
 using Shared.Infrastructure;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddSingleton<IClock, SystemClock>();
 
 builder.Services.AddDbContextPool<AppDbContext>(opt =>
 {
@@ -24,19 +26,19 @@ app.MapHealthChecks("/health");
 app.MapPost("/v1/portfolios", async Task<Results<Created<PortfolioResponse>, BadRequest<string>>> (
     CreatePortfolioRequest req,
     AppDbContext db,
+    IClock clock,
     CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(req.Name))
         return TypedResults.BadRequest("Name is required.");
 
-    var now = DateTimeOffset.UtcNow;
-    var portfolio = new Portfolio(req.Name, now);
+    var portfolio = new Portfolio(req.Name, clock.UtcNow);
 
     db.Portfolios.Add(portfolio);
     await db.SaveChangesAsync(ct);
 
-    return TypedResults.Created($"/v1/portfolios/{portfolio.Id}", new PortfolioResponse(
-        portfolio.Id,
+    return TypedResults.Created($"/v1/portfolios/{portfolio.Id.Value}", new PortfolioResponse(
+        portfolio.Id.Value,
         portfolio.Name,
         portfolio.CreatedAtUtc
     ));
@@ -50,17 +52,17 @@ app.MapGet("/v1/portfolios/{id:guid}", async Task<Results<Ok<PortfolioDetailsRes
     var p = await db.Portfolios
         .AsNoTracking()
         .Include(x => x.Positions)
-        .FirstOrDefaultAsync(x => x.Id == id, ct);
+        .FirstOrDefaultAsync(x => x.Id == new PortfolioId(id), ct);
 
     if (p is null) return TypedResults.NotFound();
 
     var resp = new PortfolioDetailsResponse(
-        p.Id,
+        p.Id.Value,
         p.Name,
         p.CreatedAtUtc,
         p.Positions.Select(pos => new PositionResponse(
-            pos.PortfolioId,
-            pos.InstrumentId,
+            pos.PortfolioId.Value,
+            pos.InstrumentId.Value,
             pos.Quantity,
             pos.CreatedAtUtc
         )).ToArray()
@@ -73,11 +75,12 @@ app.MapPost("/v1/portfolios/{id:guid}/positions", async Task<Results<Ok, NotFoun
     Guid id,
     AddPositionRequest req,
     AppDbContext db,
+    IClock clock,
     CancellationToken ct) =>
 {
     var p = await db.Portfolios
         .Include(x => x.Positions)
-        .FirstOrDefaultAsync(x => x.Id == id, ct);
+        .FirstOrDefaultAsync(x => x.Id == new PortfolioId(id), ct);
 
     if (p is null) return TypedResults.NotFound();
 
@@ -89,7 +92,7 @@ app.MapPost("/v1/portfolios/{id:guid}/positions", async Task<Results<Ok, NotFoun
 
     try
     {
-        p.AddPosition(req.InstrumentId, req.Quantity, DateTimeOffset.UtcNow);
+        p.AddPosition(req.InstrumentId, req.Quantity, clock.UtcNow, clock);
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok();
     }

@@ -29,6 +29,24 @@ public readonly record struct InstrumentId(Guid Value)
     public override string ToString() => Value.ToString();
 }
 
+public sealed class Instrument : Entity
+{
+    public InstrumentId Id { get; private set; }
+    public string Symbol { get; private set; } = "";
+    public string? Description { get; private set; }
+    public DateTimeOffset CreatedAtUtc { get; private set; }
+
+    private Instrument() { }
+
+    public Instrument(string symbol, string? description, DateTimeOffset createdAtUtc)
+    {
+        Id = InstrumentId.New();
+        Symbol = symbol;
+        Description = description;
+        CreatedAtUtc = createdAtUtc;
+    }
+}
+
 public sealed class Portfolio : Entity
 {
     public PortfolioId Id { get; private set; }
@@ -39,18 +57,25 @@ public sealed class Portfolio : Entity
 
     private Portfolio() { } // EF
 
+    public Portfolio(string name, DateTimeOffset createdAtUtc) : this(PortfolioId.New(), name, createdAtUtc)
+    {
+    }
+
     public Portfolio(PortfolioId portfolioId, string name, DateTimeOffset createdAtUtc)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Portfolio name is required.", nameof(name));
 
-        Id = PortfolioId.New();
+        Id = portfolioId;
         Name = name.Trim();
         CreatedAtUtc = createdAtUtc;
 
     }
 
-public void AddPosition(InstrumentId instrumentId, decimal quantity, DateTimeOffset createdAtUtc, IClock clock)
+    public void AddPosition(Guid instrumentId, decimal quantity, DateTimeOffset createdAtUtc, IClock clock)
+        => AddPosition(new InstrumentId(instrumentId), quantity, createdAtUtc, clock);
+
+    public void AddPosition(InstrumentId instrumentId, decimal quantity, DateTimeOffset createdAtUtc, IClock clock)
     {
         Guard.GuidNotEmpty(instrumentId.Value, nameof(instrumentId));
         Guard.NotZero(quantity, nameof(quantity));
@@ -87,7 +112,7 @@ public sealed class Position
         InstrumentId = instrumentId;
         Quantity = quantity;
         CreatedAtUtc = createdAtUtc;
-        Version = Version;
+        Version = 1;
     }
 
     public void SetQuantity(decimal quantity)
