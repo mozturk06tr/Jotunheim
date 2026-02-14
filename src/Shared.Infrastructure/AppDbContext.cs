@@ -20,7 +20,10 @@ public sealed class AppDbContext : DbContext
         {
             b.ToTable("portfolios");
             b.HasKey(x => x.Id);
-            
+
+            b.Property(x => x.Id)
+                .HasConversion(v => v.Value, v => new PortfolioId(v));
+
             b.Property(x => x.Name).HasMaxLength(200).IsRequired();
             b.Property(x => x.CreatedAtUtc).IsRequired();
                 
@@ -38,6 +41,10 @@ public sealed class AppDbContext : DbContext
         {
             b.ToTable("instruments");
             b.HasKey(x => x.Id);
+
+            b.Property(x => x.Id)
+                .HasConversion(v => v.Value, v => new InstrumentId(v));
+
             b.Property(x => x.Symbol).HasMaxLength(32).IsRequired();
             b.HasIndex(x => x.Symbol).IsUnique();
             b.Property(x => x.Description).HasMaxLength(512);
@@ -48,6 +55,11 @@ public sealed class AppDbContext : DbContext
         {
             b.ToTable("positions");
             b.HasKey(x => new { x.PortfolioId, x.InstrumentId });
+
+            b.Property(x => x.PortfolioId)
+                .HasConversion(v => v.Value, v => new PortfolioId(v));
+            b.Property(x => x.InstrumentId)
+                .HasConversion(v => v.Value, v => new InstrumentId(v));
 
             b.Property(x => x.Quantity).HasColumnType("numeric(30,10)").IsRequired();
             b.Property(x => x.CreatedAtUtc).IsRequired();
@@ -62,6 +74,9 @@ public sealed class AppDbContext : DbContext
         {
             b.ToTable("prices");
             b.HasKey(x => new { x.InstrumentId, x.TsUtc });
+
+            b.Property(x => x.InstrumentId)
+                .HasConversion(v => v.Value, v => new InstrumentId(v));
 
             b.Property(x => x.Px).HasColumnType("numeric(30,10)").IsRequired();
             b.Property(x => x.TsUtc).IsRequired();

@@ -1,21 +1,19 @@
-﻿FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
-USER $APP_UID
-WORKDIR /app
-
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["Jotunheim.Cli/Jotunheim.Cli.csproj", "Jotunheim.Cli/"]
-RUN dotnet restore "Jotunheim.Cli/Jotunheim.Cli.csproj"
+
+COPY Jotunheim.slnx .
+COPY src/Shared.Domain/Shared.Domain.csproj src/Shared.Domain/
+COPY src/Shared.Infrastructure/Shared.Infrastructure.csproj src/Shared.Infrastructure/
+COPY src/Jotunheim.Cli/Jotunheim.Cli.csproj src/Jotunheim.Cli/
+COPY src/Gateway.Api/Gateway.Api.csproj src/Gateway.Api/
+
+RUN dotnet restore Jotunheim.slnx
+
 COPY . .
-WORKDIR "/src/Jotunheim.Cli"
-RUN dotnet build "./Jotunheim.Cli.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet publish src/Jotunheim.Cli/Jotunheim.Cli.csproj -c Release -o /out /p:UseAppHost=false
 
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Jotunheim.Cli.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-FROM base AS final
+FROM mcr.microsoft.com/dotnet/runtime:10.0
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /out ./
+
 ENTRYPOINT ["dotnet", "Jotunheim.Cli.dll"]
