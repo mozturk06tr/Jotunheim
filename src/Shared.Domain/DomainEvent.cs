@@ -1,4 +1,4 @@
-﻿namespace Shared.Domain;
+namespace Shared.Domain;
 
 internal interface IDomainEvent
 {
@@ -31,6 +31,15 @@ internal sealed record InstrumentPriceUpdated(
     DateTimeOffset OccurredOn
     ) : IDomainEvent;
 
+
+public sealed record InstrumentPriceUpdateFailed(
+    Guid InstrumentId,
+    decimal Price,
+    Exception Exception,
+    string Message,
+    DateTimeOffset OccurredOn
+    ) : IDomainEvent;
+
 internal ref struct DomainEventFailed
 {
     internal Exception Exception { get; }
@@ -43,3 +52,4 @@ internal ref struct DomainEventFailed
         OccurredOn = DateTimeOffset.UtcNow;
     }
 }
+
