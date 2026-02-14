@@ -2,6 +2,7 @@ namespace Shared.Domain.Utils;
 
 // <summary>
 // A utility class for validating method parameters and state conditions.
+// This class' main purpose is to eliminate heavy if/else usage in control flow.
 // </summary>
 internal static class Guard
 {
